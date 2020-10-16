@@ -1767,6 +1767,41 @@ benchmarks! {
 		sbox.invoke();
 	}
 
+	// w_br_table_per_entry = w_bench
+	instr_br_table_per_entry {
+		let e in 1 .. Contracts::<T>::current_schedule().limits.br_table_size;
+		use body::DynInstr::{RandomI64, RandomI32, Regular};
+		let entry: Vec<u32> = [0, 1].iter()
+			.cloned()
+			.cycle()
+			.take((e / 2) as usize).collect();
+		let table = Box::new(parity_wasm::elements::BrTableData {
+			table: entry.into_boxed_slice(),
+			default: 0,
+		});
+		let mut sbox = Sandbox::from(&WasmModule::<T>::from(ModuleDefinition {
+			call_body: Some(body::repeated_dyn(INSTR_BENCHMARK_BATCH_SIZE, vec![
+				Regular(Instruction::Block(BlockType::NoResult)),
+				Regular(Instruction::Block(BlockType::NoResult)),
+				Regular(Instruction::Block(BlockType::NoResult)),
+				RandomI32(0, (e + 1) as i32), // Make sure the default entry is also used
+				Regular(Instruction::BrTable(table)),
+				RandomI64(i64::min_value(), i64::max_value()),
+				Regular(Instruction::Drop),
+				Regular(Instruction::End),
+				RandomI64(i64::min_value(), i64::max_value()),
+				Regular(Instruction::Drop),
+				Regular(Instruction::End),
+				RandomI64(i64::min_value(), i64::max_value()),
+				Regular(Instruction::Drop),
+				Regular(Instruction::End),
+			])),
+			.. Default::default()
+		}));
+	}: {
+		sbox.invoke();
+	}
+
 	// w_call = w_bench - 2 * w_param
 	//
 	// This is a very slow instruction. We therefore use the API benchmark batch
@@ -2063,5 +2098,4 @@ mod tests {
 	create_test!(seal_hash_blake2_256_per_kb);
 	create_test!(seal_hash_blake2_128);
 	create_test!(seal_hash_blake2_128_per_kb);
-	create_test!(instr_br_table);
 }
